@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini Haxball Completo</title>
+  <style>
+    body {
+      background: #222;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      font-family: Arial, sans-serif;
+      color: white;
+      user-select: none;
+    }
+    #gameCanvas {
+      background: #006400; /* verde grama */
+      border: 3px solid white;
+      display: block;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 14px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="800" height="500"></canvas>
+  <div id="info">
+    <p><b>Controles Jogador 1:</b> Setas ↑ ↓ ← →</p>
+    <p><b>Controles Jogador 2:</b> W A S D</p>
+    <p>Para ativar IA no Jogador 2, altere a variável <code>useBot</code> no código para <code>true</code>.</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const WIDTH = canvas.width;
+    const HEIGHT = canvas.height;
+
+    // Variável para ativar IA no jogador 2
+    const useBot = false; // true = IA, false = controle manual com WASD
+
+    let score1 = 0;
+    let score2 = 0;
+
+    const player1 = {
+      x: 100,
+      y: HEIGHT / 2,
+      radius: 20,
+      speed: 4,
+      color: "blue",
+      dx: 0,
+      dy: 0
+    };
+
+    const player2 = {
+      x: WIDTH - 100,
+      y: HEIGHT / 2,
+      radius: 20,
+      speed: 3.2,
+      color: "red",
+      dx: 0,
+      dy: 0
+    };
+
+    const ball = {
+      x: WIDTH / 2,
+      y: HEIGHT / 2,
+      radius: 15,
+      color: "white",
+      dx: 3,
+      dy: 2
+    };
+
+    const goalWidth = 10;
+    const goalHeight = 100;
+
+    function resetBall() {
+      ball.x = WIDTH / 2;
+      ball.y = HEIGHT / 2;
+      ball.dx = Math.random() > 0.5 ? 3 : -3;
+      ball.dy = (Math.random() - 0.5) * 4;
+    }
+
+    function drawCircle(obj) {
+      ctx.beginPath();
+      ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2);
+      ctx.fillStyle = obj.color;
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function updatePlayer(player) {
+      player.x += player.dx;
+      player.y += player.dy;
+
+      // Limitar dentro do campo
+      player.x = Math.max(player.radius, Math.min(WIDTH - player.radius, player.x));
+      player.y = Math.max(player.radius, Math.min(HEIGHT - player.radius, player.y));
+    }
+
+    function updateBall() {
+      ball.x += ball.dx;
+      ball.y += ball.dy;
+
+      // Colisão com teto e chão
+      if (ball.y < ball.radius || ball.y > HEIGHT - ball.radius) ball.dy *= -1;
+
+      // Verifica se fez gol (bola saiu da tela pelas laterais dentro da área do gol)
+      if (
+        ball.x < -ball.radius
+      ) {
+        score2++;
+        resetBall();
+      }
+      if (
+        ball.x > WIDTH + ball.radius
+      ) {
+        score1++;
+        resetBall();
+      }
+    }
+
+    function checkCollision(player) {
+      const dx = ball.x - player.x;
+      const dy = ball.y - player.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < ball.radius + player.radius) {
+        let angle = Math.atan2(dy, dx);
+        ball.dx = Math.cos(angle) * 3;
+        ball.dy = Math.sin(angle) * 3;
+      }
+    }
+
+    function drawField() {
+      ctx.fillStyle = "green";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // Linha central
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(WIDTH / 2, 0);
+      ctx.lineTo(WIDTH / 2, HEIGHT);
+      ctx.stroke();
+
+      // Círculo central
+      ctx.beginPath();
+      ctx.arc(WIDTH / 2, HEIGHT / 2, 60, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Goleiras
+      ctx.fillStyle = "yellow";
+      ctx.fillRect(0, (HEIGHT - goalHeight) / 2, goalWidth, goalHeight);
+      ctx.fillRect(WIDTH - goalWidth, (HEIGHT - goalHeight) / 2, goalWidth, goalHeight);
+    }
+
+    function drawScore() {
+      ctx.fillStyle = "white";
+      ctx.font = "30px Arial";
+      ctx.fillText(`${score1} - ${score2}`, WIDTH / 2 - 40, 40);
+    }
+
+    function draw() {
+      drawField();
+      drawCircle(player1);
+      drawCircle(player2);
+      drawCircle(ball);
+      drawScore();
+    }
+
+    function updateBotAI() {
+      // Jogador 2 persegue a bola verticalmente
+      if (ball.y < player2.y - 5) {
+        player2.dy = -player2.speed;
+      } else if (ball.y > player2.y + 5) {
+        player2.dy = player2.speed;
+      } else {
+        player2.dy = 0;
+      }
+      player2.dx = 0; // Não se move horizontalmente
+    }
+
+    function update() {
+      updatePlayer(player1);
+
+      if (useBot) {
+        updateBotAI();
+        updatePlayer(player2);
+      } else {
+        updatePlayer(player2);
+      }
+
+      updateBall();
+
+      checkCollision(player1);
+      checkCollision(player2);
+    }
+
+    function loop() {
+      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // Controles
+    const keys = {};
+    document.addEventListener("keydown", (e) => {
+      keys[e.key] = true;
+
+      // Jogador 1 (setas)
+      if (keys["ArrowUp"]) player1.dy = -player1.speed;
+      if (keys["ArrowDown"]) player1.dy = player1.speed;
+      if (keys["ArrowLeft"]) player1.dx = -player1.speed;
+      if (keys["ArrowRight"]) player1.dx = player1.speed;
+
+      // Jogador 2 (WASD) só se não usar bot
+      if (!useBot) {
+        if (keys["w"]) player2.dy = -player2.speed;
+        if (keys["s"]) player2.dy = player2.speed;
+        if (keys["a"]) player2.dx = -player2.speed;
+        if (keys["d"]) player2.dx = player2.speed;
+      }
+    });
+
+    document.addEventListener("keyup", (e) => {
+      keys[e.key] = false;
+
+      // Jogador 1
+      if (!keys["ArrowUp"] && !keys["ArrowDown"]) player1.dy = 0;
+      if (!keys["ArrowLeft"] && !keys["ArrowRight"]) player1.dx = 0;
+
+      // Jogador 2 (se não bot)
+      if (!useBot) {
+        if (!keys["w"] && !keys["s"]) player2.dy = 0;
+        if (!keys["a"] && !keys["d"]) player2.dx = 0;
+      }
+    });
+
+    loop();
+  </script>
+</body>
+</html>
